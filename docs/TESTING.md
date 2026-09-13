@@ -91,7 +91,7 @@ Do not add exemptions for scripts with branching logic.
 | `tests/test_bling.bats` | `ublue-bling` — shell config injection install/uninstall |
 | `tests/test_bling_preexec_rearm.bats` | `bling/bash-preexec-rearm.sh` — DEBUG trap re-arm with array/scalar `PROMPT_COMMAND`, idempotency, degradation when bash-preexec is absent |
 | `tests/test_luks_tpm2.bats` | `luks-tpm2-autounlock` — UUID parsing, device resolution, cryptenroll flag construction |
-| `tests/test_rechunker_group_fix.bats` | `rechunker-group-fix` — group/gshadow append, duplicate detection, format |
+| `tests/test_rechunker_group_fix.bats` | `rechunker-group-fix` — group/gshadow append, duplicate detection, format; service ordering contract and `systemd-analyze verify` cycle check |
 | `tests/test_bling_fastfetch.bats` | `ublue-bling-fastfetch` — all 9 accent colors, dconf/gsettings fallback chain, FASTFETCH_FORCE_THEME override |
 | `tests/test_changelog.bats` | `changelog.just` — LTS/non-LTS repo selection, URL construction, exit behaviour |
 | `tests/test_native_recipes.bats` | Native recipes with a leftover `bctl`: CLI setup, devmode, signed channel switching, VM setup, Flatpak bundles, and both reset confirmations |

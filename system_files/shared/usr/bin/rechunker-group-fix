@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 
-# To use this script, you'll want to put this in your systemd service:
+# To use this script, you'll want to put this in your systemd service
+# (ordered before systemd-sysusers.service, see rechunker-group-fix.service):
 # rm /etc/gshadow
 # systemd-sysusers
 # (run this script)
-# systemd-tmpfiles --create --remove --boot --exclude-prefix=/dev
 # This will populate /etc/group successfully, and then populate /etc/gshadow
-# with any missing groups that we nuked when we removed /etc/gshadow
+# with any missing groups that we nuked when we removed /etc/gshadow.
+# The regular systemd-tmpfiles-setup.service pass runs afterwards, once the
+# repaired groups exist and local filesystems are mounted.
 #
 # TODO: This entire script is a workaround for systemd-sysusers not managing
 # /etc/gshadow on bootc images. Remove once upstream resolves it:

@@ -80,17 +80,28 @@ Key files (all live in `system_files/shared/`):
 
 ### Service ordering (critical — do not change without understanding this)
 
-As of [common#530](https://github.com/projectbluefin/common/pull/530), the service must run with:
+The service must run with:
 
 ```ini
 DefaultDependencies=no
-Wants=local-fs.target
-After=local-fs.target
+After=systemd-remount-fs.service
 After=bootc-sysusers-shadow-sync.service
 Before=systemd-sysusers.service
 ```
 
-**Why:** `systemd-sysusers` is what fails if gshadow is corrupt. The service must run *before* sysusers, not after. `bootc-sysusers-shadow-sync.service` is the upstream fix shipped in bootc ≥1.16 ([bootc#2207](https://github.com/bootc-dev/bootc/pull/2207), merged May 2025); our service must run after it so they coexist correctly. `DefaultDependencies=no` is required for any early-boot unit.
+**Why:** `systemd-sysusers` is what fails if gshadow is corrupt. The service must run *before* sysusers, not after, under the same preconditions sysusers itself requires (`After=systemd-remount-fs.service`, so `/etc` is writable). `bootc-sysusers-shadow-sync.service` is the upstream fix shipped in bootc ≥1.16 ([bootc#2207](https://github.com/bootc-dev/bootc/pull/2207), merged May 2025); our service must run after it so they coexist correctly. `DefaultDependencies=no` is required for any early-boot unit.
+
+**Never add `Wants=local-fs.target` / `After=local-fs.target`** (the ordering [common#530](https://github.com/projectbluefin/common/pull/530) shipped with). `systemd-sysusers.service` is ordered before `systemd-tmpfiles-setup-dev.service`, which is ordered before `local-fs-pre.target`, which is ordered before `local-fs.target`, so that edge closes an ordering cycle:
+
+```text
+Found ordering cycle on systemd-sysusers.service/start; has dependency on rechunker-group-fix.service/start, local-fs.target/start, local-fs-pre.target/start, systemd-tmpfiles-setup-dev.service/start
+```
+
+systemd breaks the cycle by deleting whichever job it reaches first — `systemd-udevd`, `systemd-sysusers`, `systemd-tmpfiles-setup-dev`, `local-fs-pre.target`, `systemd-ask-password-console.path` (the LUKS password agent), … — so the failure is per-boot nondeterministic: 90 s device timeouts, `/var` never mounted, encrypted volumes never unlocked, or a black screen ([common#918](https://github.com/projectbluefin/common/issues/918), [bluefin-lts#628](https://github.com/projectbluefin/bluefin-lts/issues/628), [bluefin-lts#585](https://github.com/projectbluefin/bluefin-lts/issues/585), [bluefin-lts#466](https://github.com/projectbluefin/bluefin-lts/issues/466)).
+
+Because the unit runs before `local-fs-pre.target`, it must not run `systemd-tmpfiles`: `/var` and `/tmp` are not mounted yet and the pass exits 65. `systemd-tmpfiles-setup.service` performs the same pass after `local-fs.target` and after `systemd-sysusers.service`.
+
+`tests/test_rechunker_group_fix.bats` enforces this contract statically and by letting `systemd-analyze verify --root=` compute the boot transaction against a minimal fixture of the stock early-boot units. Downstream images must not try to fix ordering with a drop-in: systemd cannot reset `After=`/`Wants=` from a drop-in (`After=` with an empty value is a no-op for dependencies), so a drop-in can only *add* edges — `Before=local-fs-pre.target` on top of the old `After=local-fs.target` produced a tighter cycle.
 
 ### flock on gshadow writes (required)
 

@@ -16,8 +16,19 @@
 Description=Fix groups for Legacy rechunker
 ConditionPathExists=/run/ostree-booted
 DefaultDependencies=no
-Wants=local-fs.target
-After=local-fs.target
+# Ordering contract: run under the same preconditions as systemd-sysusers.service
+# (and bootc-sysusers-shadow-sync.service): after the root fs is remounted
+# read-write, before systemd-sysusers.service.
+#
+# Do NOT order this unit after local-fs.target. systemd-sysusers.service is
+# ordered before systemd-tmpfiles-setup-dev.service, which is ordered before
+# local-fs-pre.target, which is ordered before local-fs.target. Adding
+# After=local-fs.target here therefore closes an ordering cycle, and systemd
+# breaks it by deleting an arbitrary early-boot job (systemd-udevd,
+# systemd-sysusers, local-fs-pre.target, systemd-ask-password-console.path, ...),
+# which results in device timeouts, an unmounted /var, a stalled LUKS unlock, or
+# a black screen depending on which job is dropped.
+After=systemd-remount-fs.service
 After=bootc-sysusers-shadow-sync.service
 Before=systemd-sysusers.service
 
@@ -27,7 +38,10 @@ ExecStart=bash -c 'touch /etc/gshadow && chmod 600 /etc/gshadow'
 ExecStart=bash -c 'rm /etc/gshadow'
 ExecStart=systemd-sysusers
 ExecStart=rechunker-group-fix
-ExecStart=systemd-tmpfiles --create --remove --boot --exclude-prefix=/dev
+# No systemd-tmpfiles pass here: this unit now runs before local-fs-pre.target,
+# so /var and /tmp are not mounted yet and the pass would fail (exit 65).
+# systemd-tmpfiles-setup.service runs the same command after local-fs.target
+# and after systemd-sysusers.service, i.e. after the groups repaired here exist.
 
 [Install]
 WantedBy=default.target multi-user.target
