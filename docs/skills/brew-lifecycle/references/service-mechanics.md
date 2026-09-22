@@ -54,6 +54,10 @@ Brewfiles.
    installed in the snapshot remains user-owned unless it was already present
    in the previous managed state. A new declaration absent from the snapshot
    becomes managed after the successful bundle pass.
+   The snapshot is persisted to `brew-preinstall-pending.json` keyed by the
+   current hash and reused if a later run retries the same hash, so packages
+   installed by a partially failed bundle are not misread as user-owned. It is
+   deleted once the run reaches the state write.
    Continue through independent Brewfiles, but exit before removals and state
    writes if any bundle fails.
 4. Diff previous formula and cask sets (from state JSON) against the current
